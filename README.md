@@ -1,6 +1,8 @@
 # jorna-news-studio
 
-<!DOCTYPE html> 
+        } 
+        
+        <!DOCTYPE html> 
 <html lang="bn"> 
 <head> 
     <meta charset="UTF-8"> 
@@ -93,10 +95,7 @@
             white-space: nowrap;
             font-size: 15px;
             font-weight: bold;
-            color: #fff;
-        } 
-        
-        .controls{ margin-top:15px; display:grid; gap:12px; background: #161616; padding: 15px; border-radius: 10px; border: 1px solid #333; } 
+            color: #fff;controls{ margin-top:15px; display:grid; gap:12px; background: #161616; padding: 15px; border-radius: 10px; border: 1px solid #333; } 
         .input-group { display: flex; flex-direction: column; gap: 5px; }
         .input-group label { font-size: 13px; color: #aaa; font-weight: bold; }
         input, textarea, button{ padding:12px; border:none; border-radius:8px; font-size:15px; width: 100%; background: #222; color: #fff; border: 1px solid #444; } 
