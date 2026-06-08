@@ -1,0 +1,267 @@
+<!DOCTYPE html> 
+<html lang="bn"> 
+<head> 
+    <meta charset="UTF-8"> 
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+    <title>JORNA NEWS Studio Pro HD</title> 
+    <style> 
+        *{ margin:0; padding:0; box-sizing:border-box; font-family:Arial,sans-serif; } 
+        body{ background:#0b0b0b; color:#fff; padding: 10px; } 
+        .header{ background:#c40000; padding:15px; text-align:center; font-size:22px; font-weight:bold; border-radius: 8px; } 
+        .studio{ width:100%; max-width:600px; margin:15px auto; } 
+        
+        /* মোবাইল স্ক্রিন প্রিভিউ */
+        .screen{ 
+            position:relative; 
+            width: 100%;
+            height:360px; 
+            background:#111; 
+            border:3px solid #c40000; 
+            border-radius:12px; 
+            overflow:hidden; 
+        } 
+        #previewVideo{ width:100%; height:100%; object-fit:cover; } 
+        
+        /* লোগো বাম সাইডে ওপরে */
+        .logo{ position:absolute; top:10px; left:15px; background:#c40000; padding:6px 12px; font-weight:bold; z-index:10; border-radius:5px; font-size: 14px; } 
+        
+        /* হেডলাইন এখন নিচে বাম সাইডের কর্নারে (ব্রেকিং নিউজের ঠিক ওপরে) */
+        .headline{ position:absolute; bottom:85px; left:15px; width:70%; max-height:75px; overflow:hidden; background:rgba(0,0,0,.85); padding:8px 12px; font-size:16px; font-weight:bold; line-height:1.3; border-left:5px solid red; z-index:10; border-radius:4px; } 
+        
+        .breaking{ position:absolute; bottom:40px; left:0; width:100%; background:#ff0000; padding:6px; font-weight:bold; font-size:14px; z-index:10; } 
+        .ticker{ position:absolute; bottom:0; left:0; width:100%; background:#003cff; padding:6px; overflow:hidden; white-space:nowrap; z-index:10; height: 40px;} 
+        .ticker span { 
+            display: inline-block; 
+            position: absolute;
+            white-space: nowrap;
+            font-size: 14px;
+            font-weight: bold;
+        } 
+        
+        .controls{ margin-top:15px; display:grid; gap:10px; } 
+        input, textarea, button{ padding:12px; border:none; border-radius:8px; font-size:16px; width: 100%; } 
+        textarea{ height:80px; resize:none; } 
+        button{ background:#c40000; color:white; font-weight:bold; cursor:pointer; } 
+        .recording-active { background: #00cc66 !important; }
+    </style> 
+</head> 
+<body> 
+
+    <div class="header"> JORNA NEWS STUDIO PRO </div> 
+    
+    <div class="studio"> 
+        <div class="screen" id="newsScreen"> 
+            <div class="logo" id="logoBox"> JORNA NEWS </div> 
+            <div class="headline"> <span id="headlineBox"> Breaking News </span> </div> 
+            <video id="previewVideo" loop playsinline muted></video> 
+            <div class="breaking"> 🔴 BREAKING NEWS </div> 
+            <div class="ticker"> <span id="tickerText"> বাংলাদেশের সর্বশেষ সংবাদ আপডেট... </span> </div> 
+        </div> 
+
+        <div class="controls"> 
+            <label style="font-size: 14px; color: #ccc;">১. ভিডিও আপলোড করুন:</label>
+            <input type="file" id="videoInput" accept="video/*"> 
+            
+            <label style="font-size: 14px; color: #ccc;">২. আপনার গোল লোগোর ছবি আপলোড করুন:</label>
+            <input type="file" id="logoInput" accept="image/*"> 
+
+            <input type="text" id="headlineInput" placeholder="Headline লিখুন" oninput="updateHeadline()"> 
+            <input type="text" id="tickerInput" placeholder="Ticker লিখুন" oninput="updateHeadline()"> 
+            <button id="recordBtn"> 🎥 নিখুঁত ক্লিয়ার ভিডিও রেকর্ড করুন </button> 
+        </div> 
+    </div> 
+
+    <canvas id="recordCanvas" width="1280" height="720" style="display:none;"></canvas>
+
+<script> 
+const video = document.getElementById('previewVideo');
+const headlineBox = document.getElementById('headlineBox');
+const tickerText = document.getElementById('tickerText');
+const canvas = document.getElementById('recordCanvas');
+const ctx = canvas.getContext('2d');
+const recordBtn = document.getElementById('recordBtn');
+
+let mediaRecorder;
+let recordedChunks = [];
+let isRecording = false;
+let animationFrameId;
+let logoImage = null; 
+
+// টিক্কার টেক্সট অ্যানিমেশন
+let tickerX = canvas.width;
+function animateTicker() {
+    tickerX -= 4; 
+    ctx.font = "bold 28px Arial"; 
+    if (tickerX < -ctx.measureText(tickerText.innerText).width - 300) {
+        tickerX = canvas.width;
+    }
+    tickerText.style.transform = `translateX(${tickerX / 2}px)`; 
+    
+    drawToCanvas();
+    
+    if (isRecording) {
+        animationFrameId = requestAnimationFrame(animateTicker);
+    }
+}
+
+function updateHeadline(){ 
+    let headline = document.getElementById("headlineInput").value; 
+    let ticker = document.getElementById("tickerInput").value; 
+    headlineBox.innerText = headline || "Breaking News"; 
+    tickerText.innerText = ticker || "বাংলাদেশের সর্বশেষ সংবাদ আপডেট..."; 
+} 
+
+// লোগো ইমেজ আপলোড
+document.getElementById("logoInput").addEventListener("change", function(e) {
+    let file = e.target.files[0];
+    if (!file) return;
+    logoImage = new Image();
+    logoImage.src = URL.createObjectURL(file);
+    logoImage.onload = function() {
+        document.getElementById("logoBox").innerText = ""; 
+        document.getElementById("logoBox").style.background = "transparent";
+        document.getElementById("logoBox").innerHTML = `<img src="${logoImage.src}" style="width:50px; height:50px; object-fit:contain; border-radius:50%;">`;
+    }
+});
+
+// ভিডিও আপলোড
+document.getElementById("videoInput").addEventListener("change", function(e){ 
+    let file = e.target.files[0]; 
+    if(!file) return; 
+    video.src = URL.createObjectURL(file); 
+    video.muted = false; 
+    video.play();
+    
+    tickerX = canvas.width;
+    isRecording = true; 
+    animateTicker();
+    isRecording = false; 
+}); 
+
+// এইচডি ক্যানভাসে এলিমেন্ট আঁকার ফাংশন
+function drawToCanvas() {
+    // ১. ব্যাকগ্রাউন্ড ভিডিও
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    
+    // ২. লোগো (বাম সাইডে ওপরে কর্নারে)
+    if (logoImage) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(80, 70, 50, 0, Math.PI * 2, true);
+        ctx.closePath();
+        ctx.clip();
+        ctx.drawImage(logoImage, 30, 20, 100, 100);
+        ctx.restore();
+    } else {
+        ctx.fillStyle = "#c40000";
+        ctx.fillRect(30, 30, 220, 50);
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 26px Arial";
+        ctx.fillText("JORNA NEWS", 50, 65);
+    }
+    
+    // ৩. হেডライン বক্স (এখন ক্যানভাসের নিচে বাম সাইডে কর্নারে - ব্রেকিং নিউজের ঠিক ওপরে)
+    // ক্যানভাসের উচ্চতা ৭২০ অনুযায়ী এর পজিশন নিচে সেট করা হয়েছে
+    ctx.fillStyle = "rgba(0, 0, 0, 0.85)";
+    ctx.fillRect(30, canvas.height - 240, canvas.width * 0.65, 110);
+    ctx.fillStyle = "red";
+    ctx.fillRect(30, canvas.height - 240, 10, 110); 
+    
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 32px Arial";
+    ctx.fillText(headlineBox.innerText, 60, canvas.height - 175);
+    
+    // ৪. ব্রেকিং নিউজ পট্টি
+    ctx.fillStyle = "#ff0000";
+    ctx.fillRect(0, canvas.height - 120, canvas.width, 50);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 28px Arial";
+    ctx.fillText("🔴 BREAKING NEWS", 30, canvas.height - 85);
+    
+    // ৫. নিচের নীল টিক্কার পট্টি
+    ctx.fillStyle = "#003cff";
+    ctx.fillRect(0, canvas.height - 70, canvas.width, 70);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 28px Arial";
+    ctx.fillText(tickerText.innerText, tickerX, canvas.height - 25);
+}
+
+// রেকর্ডিং ও ফাইল জেনারেট
+recordBtn.addEventListener("click", () => {
+    if (!isRecording) {
+        recordedChunks = [];
+        isRecording = true;
+        
+        const videoStream = canvas.captureStream(30);
+        
+        if (video.captureStream || video.mozCaptureStream) {
+            const audioStream = video.captureStream ? video.captureStream() : video.mozCaptureStream();
+            const audioTracks = audioStream.getAudioTracks();
+            if (audioTracks.length > 0) {
+                videoStream.addTrack(audioTracks[0]); 
+            }
+        }
+
+        let options = { 
+            mimeType: 'video/webm;codecs=vp9,opus',
+            videoBitsPerSecond: 5000000 
+        };
+        
+        if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+            options = { mimeType: 'video/mp4', videoBitsPerSecond: 5000000 }; 
+        }
+
+        try {
+            mediaRecorder = new MediaRecorder(videoStream, options);
+        } catch (e) {
+            mediaRecorder = new MediaRecorder(videoStream);
+        }
+
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) recordedChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = () => {
+            const blob = new Blob(recordedChunks, { type: "video/mp4" });
+            const url = URL.createObjectURL(blob);
+            
+            let outputVideo = document.getElementById('outputVideo');
+            if(!outputVideo) {
+                outputVideo = document.createElement('video');
+                outputVideo.id = 'outputVideo';
+                outputVideo.controls = true;
+                outputVideo.style.width = '100%';
+                outputVideo.style.marginTop = '15px';
+                outputVideo.style.border = '2px solid #00cc66';
+                outputVideo.style.borderRadius = '8px';
+                document.querySelector('.controls').appendChild(outputVideo);
+            }
+            outputVideo.src = url;
+            
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "JORNA_NEWS_HD_STUDIO.mp4";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+
+            alert("ভিডিওটি সম্পূর্ণ এইচডি কোয়ালিটিতে ফ্রেমসহ তৈরি হয়েছে! নিচে প্লে করে দেখতে পারেন বা ডাউনলোড ফোল্ডার চেক করুন।");
+        };
+
+        animateTicker();
+        mediaRecorder.start();
+        
+        recordBtn.innerText = "🛑 স্টুডিওসহ এইচডি ডাউনলোড করুন";
+        recordBtn.classList.add("recording-active");
+    } else {
+        isRecording = false;
+        mediaRecorder.stop();
+        cancelAnimationFrame(animationFrameId);
+        
+        recordBtn.innerText = "🎥 নিখুঁত ক্লিয়ার ভিডিও রেকর্ড করুন";
+        recordBtn.classList.remove("recording-active");
+    }
+});
+</script> 
+</body> 
+</html>
